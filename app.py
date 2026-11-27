@@ -56,7 +56,7 @@ def init_db():
         cols = [row["name"] for row in c.execute("PRAGMA table_info(attendance)").fetchall()]
         if "event_type" not in cols:
             c.execute("ALTER TABLE attendance ADD COLUMN event_type TEXT NOT NULL DEFAULT 'CHECK_IN'")
-
+init_db()
 def admin_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
