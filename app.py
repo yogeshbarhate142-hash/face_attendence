@@ -68,8 +68,11 @@ def admin_required(fn):
     return wrapper
 
 def save_image(upload):
-    if not upload or not upload.mimetype.startswith("image/"):
+    if not upload or not upload.filename:
         raise ValueError("A camera image is required.")
+    mimetype = (upload.mimetype or "").lower()
+    if not mimetype.startswith("image/"):
+        raise ValueError("Uploaded file must be an image.")
     filename = secure_filename(uuid.uuid4().hex + ".jpg")
     path = os.path.join(FACE_DIR, filename)
     upload.save(path)
@@ -150,21 +153,18 @@ def admin_me():
 def add_member():
     name = (request.form.get("full_name") or "").strip()
     member_code = (request.form.get("member_code") or "").strip()
-        if not org_code or not member_code:
-        return jsonify(error="Required information is missing."), 400
-
-    if len(org_code) > 20 or len(member_code) > 50:
-        return jsonify(error="Invalid request."), 400
-
     face_file = request.files.get("face")
 
-    if not face_file or not face_file.filename:
-        return jsonify(error="Face image is required."), 400
     if not name or not member_code:
         return jsonify(error="Name and member code are required."), 400
+    if len(name) > 100 or len(member_code) > 50:
+        return jsonify(error="Name or member code is too long."), 400
+    if not face_file or not face_file.filename:
+        return jsonify(error="Face image is required."), 400
+
     path = None
     try:
-        path = save_image(request.files.get("face"))
+        path = save_image(face_file)
         validate_face(path)
         person_id = str(uuid.uuid4())
         with connect() as c:
@@ -173,11 +173,14 @@ def add_member():
                        datetime.now(timezone.utc).isoformat()))
         return jsonify(message="Member enrolled.", member_id=person_id)
     except sqlite3.IntegrityError:
-        if path and os.path.exists(path): os.remove(path)
+        if path and os.path.exists(path):
+            os.remove(path)
         return jsonify(error="That member code is already in use in this organization."), 409
     except Exception:
-        if path and os.path.exists(path): os.remove(path)
+        if path and os.path.exists(path):
+            os.remove(path)
         return jsonify(error="Could not enroll face. Use a clear, front-facing image."), 400
+
 # Basic rate limiting for attendance attempts
 ATTENDANCE_ATTEMPTS = defaultdict(list)
 ATTENDANCE_LIMIT = 8
@@ -196,17 +199,23 @@ def attendance_rate_limited(ip):
     attempts.append(now)
     return False
 @app.post("/api/attendance")
+def mark_attendance():
     ip = request.remote_addr or "unknown"
-
     if attendance_rate_limited(ip):
         return jsonify(error="Too many attempts. Please wait 60 seconds and try again."), 429
-def mark_attendance():
+
     org_code = (request.form.get("org_code") or "").strip().upper()
     member_code = (request.form.get("member_code") or "").strip()
+    face_file = request.files.get("face")
+    if not org_code or not member_code:
+        return jsonify(error="Organization code and member code are required."), 400
+    if not face_file or not face_file.filename:
+        return jsonify(error="Face image is required."), 400
+
     live_path = None
     try:
         live_path = save_image(face_file)
-validate_face(live_path)
+        validate_face(live_path)
         with connect() as c:
             person = c.execute("""SELECT p.* FROM people p JOIN organizations o ON o.id=p.org_id
                                   WHERE o.code=? AND p.member_code=?""",
@@ -224,9 +233,8 @@ validate_face(live_path)
     except Exception:
         return jsonify(error="Verification failed. Try again with good lighting."), 400
     finally:
-        if live_path and os.path.exists(live_path): os.remove(live_path)
-
-
+        if live_path and os.path.exists(live_path):
+            os.remove(live_path)
 
 @app.post("/api/kiosk/identify")
 def kiosk_identify():
