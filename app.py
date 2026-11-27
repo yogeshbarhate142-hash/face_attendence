@@ -150,6 +150,16 @@ def admin_me():
 def add_member():
     name = (request.form.get("full_name") or "").strip()
     member_code = (request.form.get("member_code") or "").strip()
+        if not org_code or not member_code:
+        return jsonify(error="Required information is missing."), 400
+
+    if len(org_code) > 20 or len(member_code) > 50:
+        return jsonify(error="Invalid request."), 400
+
+    face_file = request.files.get("face")
+
+    if not face_file or not face_file.filename:
+        return jsonify(error="Face image is required."), 400
     if not name or not member_code:
         return jsonify(error="Name and member code are required."), 400
     path = None
