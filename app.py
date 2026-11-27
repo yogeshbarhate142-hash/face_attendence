@@ -168,7 +168,23 @@ def add_member():
     except Exception:
         if path and os.path.exists(path): os.remove(path)
         return jsonify(error="Could not enroll face. Use a clear, front-facing image."), 400
+# Basic rate limiting for attendance attempts
+ATTENDANCE_ATTEMPTS = defaultdict(list)
+ATTENDANCE_LIMIT = 8
+ATTENDANCE_WINDOW = 60  # seconds
 
+
+def attendance_rate_limited(ip):
+    now = time.monotonic()
+    attempts = ATTENDANCE_ATTEMPTS[ip]
+
+    attempts[:] = [t for t in attempts if now - t < ATTENDANCE_WINDOW]
+
+    if len(attempts) >= ATTENDANCE_LIMIT:
+        return True
+
+    attempts.append(now)
+    return False
 @app.post("/api/attendance")
 def mark_attendance():
     org_code = (request.form.get("org_code") or "").strip().upper()
