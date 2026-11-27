@@ -85,7 +85,16 @@ def match_face(live_path, enrolled_path):
 
 @app.get("/")
 def index():
-    return render_template("index.html", signed_in=bool(session.get("admin_id")),
+    return render_template("index.html")
+
+@app.get("/attendance")
+def attendance_page():
+    return render_template("attendance.html")
+
+@app.get("/dashboard")
+def dashboard_page():
+    return render_template("dashboard.html",
+                           signed_in=bool(session.get("admin_id")),
                            org_name=session.get("org_name"))
 
 @app.post("/api/org/signup")
