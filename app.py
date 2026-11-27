@@ -186,6 +186,10 @@ def attendance_rate_limited(ip):
     attempts.append(now)
     return False
 @app.post("/api/attendance")
+    ip = request.remote_addr or "unknown"
+
+    if attendance_rate_limited(ip):
+        return jsonify(error="Too many attempts. Please wait 60 seconds and try again."), 429
 def mark_attendance():
     org_code = (request.form.get("org_code") or "").strip().upper()
     member_code = (request.form.get("member_code") or "").strip()
