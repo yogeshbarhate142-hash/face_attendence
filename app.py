@@ -205,7 +205,8 @@ def mark_attendance():
     member_code = (request.form.get("member_code") or "").strip()
     live_path = None
     try:
-        live_path = save_image(request.files.get("face"))
+        live_path = save_image(face_file)
+validate_face(live_path)
         with connect() as c:
             person = c.execute("""SELECT p.* FROM people p JOIN organizations o ON o.id=p.org_id
                                   WHERE o.code=? AND p.member_code=?""",
