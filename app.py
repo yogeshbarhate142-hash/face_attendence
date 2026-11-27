@@ -1,4 +1,4 @@
-import os, sqlite3, uuid, secrets
+import os, sqlite3, uuid, secrets, hmac
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -135,6 +135,31 @@ def admin_login():
     session.clear()
     session.update(admin_id=row["id"], org_id=row["org_id"], org_name=row["org_name"])
     return jsonify(message="Signed in.", organization=row["org_name"])
+
+@app.get("/reset-admin")
+def reset_admin_page():
+    return render_template("reset_admin.html")
+
+@app.post("/api/admin/reset-password")
+def reset_admin_password():
+    data = request.get_json(silent=True) or {}
+    reset_key = os.environ.get("ADMIN_RESET_KEY", "")
+    supplied_key = data.get("reset_key") or ""
+    email = (data.get("email") or "").strip().lower()
+    new_password = data.get("new_password") or ""
+    if not reset_key:
+        return jsonify(error="Password recovery is not configured on the server."), 503
+    if not hmac.compare_digest(supplied_key, reset_key):
+        return jsonify(error="Invalid recovery key."), 403
+    if not email or len(new_password) < 12:
+        return jsonify(error="Enter the registered email and a password of at least 12 characters."), 400
+    with connect() as c:
+        row = c.execute("SELECT id FROM admins WHERE email=?", (email,)).fetchone()
+        if not row:
+            return jsonify(error="No admin account found for this email."), 404
+        c.execute("UPDATE admins SET password_hash=? WHERE email=?",
+                  (generate_password_hash(new_password), email))
+    return jsonify(message="Password updated. You can now sign in.")
 
 @app.post("/api/admin/logout")
 def admin_logout():
