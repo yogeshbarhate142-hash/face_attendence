@@ -1,0 +1,2 @@
+const $=id=>document.getElementById(id);
+$("reset").onclick=async()=>{const btn=$("reset");btn.disabled=true;$("msg").textContent="";try{const r=await fetch("/api/admin/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:$("email").value,reset_key:$("key").value,new_password:$("password").value})});const d=await r.json();if(!r.ok)throw Error(d.error||"Reset failed");$("msg").textContent=d.message+" Return to Admin sign in.";}catch(e){$("msg").textContent=e.message;}finally{btn.disabled=false;}};
